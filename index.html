@@ -13,7 +13,7 @@
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 10px; }
-        td {scroll-margin-top: 400px;}
+        td {scroll-margin-top: 200px;}
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
@@ -124,49 +124,50 @@
 
     <div id="tab-stock" class="tab-content">
         <div class="max-w-full mx-auto px-6 space-y-4">
-            <div class="bg-white py-3 px-6 rounded-[20px] shadow-md border border-slate-200 sticky top-14 z-40">
-                <div class="flex flex-col lg:flex-row gap-6 items-end">
+            <div class="bg-white py-4 px-6 rounded-[20px] shadow-md border border-slate-200 sticky top-14 z-40">
+                <div class="flex flex-row items-center gap-5 flex-nowrap">
                     
-                    <div class="lg:w-1/4">
-                        <label class="block text-[10px] font-black text-slate-400 mb-1 uppercase">1. 업체 / 굴절률 / 설계 / 코팅 종류</label>
-                        <div class="grid grid-cols-2 gap-1 mb-1">
-                            <select id="stockCompany" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
-                                <option>신성옵틱</option><option>하이비전</option><option>은하옵틱</option><option>자이스</option>
-                            </select>
-                            <select id="stockIndex" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
+                    <div class="shrink-0 flex flex-col gap-1.5 w-[260px]">
+                        <div class="flex gap-1.5">
+                            <select id="stockCompany" class="flex-1 p-2 border-2 border-slate-100 rounded-xl font-black text-sm bg-slate-50 outline-none focus:border-blue-500" onchange="renderStockGrid()"></select>
+                            <select id="stockIndex" class="w-20 p-2 border-2 border-slate-100 rounded-xl font-black text-sm bg-slate-50 outline-none" onchange="renderStockGrid()">
                                 <option>1.56</option><option>1.60</option><option>1.67</option><option>1.74</option>
                             </select>
                         </div>
-                        <div class="grid grid-cols-2 gap-1">
-                            <select id="stockDesign" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
+                        <div class="flex gap-1.5">
+                            <select id="stockDesign" class="flex-1 p-2 border-2 border-slate-100 rounded-xl font-black text-sm bg-slate-50 outline-none" onchange="renderStockGrid()">
                                 <option>구면</option><option selected>비구면</option><option>양면비구면</option>
                             </select>
-                            <select id="stockType" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
+                            <select id="stockType" class="w-20 p-2 border-2 border-slate-100 rounded-xl font-black text-sm bg-slate-50 outline-none" onchange="renderStockGrid()">
                                 <option>멀티</option><option selected>청광</option>
                             </select>
                         </div>
                     </div>
 
-                    <div class="lg:w-1/5">
-                        <label class="block text-[10px] font-black text-blue-600 mb-1 uppercase">2. 도수 방식</label>
-                        <div class="flex gap-1">
-                            <button onclick="changeStockSign('-')" id="btn-stock-minus" class="flex-1 py-2 rounded-lg font-black text-xs bg-blue-600 text-white shadow-sm">근시(-)</button>
-                            <button onclick="changeStockSign('+')" id="btn-stock-plus" class="flex-1 py-2 rounded-lg font-black text-xs bg-slate-100 text-slate-400">원시(+)</button>
-                            <button onclick="changeStockSign('mixed')" id="btn-stock-mixed" class="flex-1 py-2 rounded-lg font-black text-xs bg-slate-100 text-slate-400">혼복(+-)</button>
-                        </div>
+                    <div class="shrink-0 flex gap-1 bg-slate-100 p-1.5 rounded-2xl">
+                        <button onclick="changeStockSign('-')" id="btn-stock-minus" class="px-4 py-3 rounded-xl font-black text-sm bg-blue-600 text-white shadow-md">근시(-)</button>
+                        <button onclick="changeStockSign('+')" id="btn-stock-plus" class="px-4 py-3 rounded-xl font-black text-sm text-slate-400 hover:bg-white transition-all">원시(+)</button>
+                        <button onclick="changeStockSign('mixed')" id="btn-stock-mixed" class="px-4 py-3 rounded-xl font-black text-sm text-slate-400 hover:bg-white transition-all">혼복(+-)</button>
                     </div>
 
-                    <div class="flex-1 flex gap-3 items-end">
-                        <div class="flex-1">
-                            <label class="block text-[10px] font-black text-red-500 mb-1 uppercase">3. 재고 바코드 스캔 (연속 스캔)</label>
-                            <input type="text" id="stockScanner" placeholder="바코드를 찍으면 해당 칸으로 이동합니다" 
-                                onkeypress="handleStockScan(event)" autocomplete="off"
-                                class="w-full p-4 border-2 border-red-50 rounded-xl text-xl font-black focus:border-red-400 outline-none transition-all">
-                        </div>
-                        <div class="flex flex-col gap-1 w-24">
-                            <button onclick="saveStockTemp()" class="h-9 bg-slate-800 text-white rounded-lg text-xs font-black hover:bg-black transition-all">임시 저장</button>
-                            <button onclick="resetStock()" class="h-9 bg-slate-100 text-slate-400 rounded-lg text-xs font-black hover:text-red-500 transition-all">전체 초기화</button>
-                        </div>
+                    <div class="flex-1 max-w-[400px] flex gap-2 items-center">
+                        <input type="text" id="stockScanner" placeholder="재고 바코드 스캔" 
+                            onkeypress="handleStockScan(event)" autocomplete="off"
+                            class="w-full p-4 border-4 border-red-50 rounded-2xl text-xl font-black focus:border-red-400 outline-none transition-all shadow-inner placeholder:text-slate-300">
+                        
+                        <button onclick="undoStockScan()" title="방금 스캔 취소" 
+                            class="shrink-0 bg-amber-500 hover:bg-amber-600 text-white p-4 rounded-2xl active:scale-95 transition-all shadow-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="shrink-0 flex items-center gap-3">
+                        <button onclick="saveStockTemp()" class="px-6 py-4 bg-slate-800 text-white rounded-2xl text-sm font-black hover:bg-black shadow-lg transition-all active:scale-95">💾 임시저장</button>
+                        <button onclick="resetStock()" class="p-3 text-slate-300 hover:text-red-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -349,7 +350,8 @@
     let currentFilterCompany = "";
     let editingRuleId = null;
     let scanCounter = 0;
-        
+    let stockUndoStack = [];
+
     // [3번 상세] 실시간 데이터 동기화
     // 서버의 'rules' 방에 변화가 생기면 내 컴퓨터의 rules 변수도 즉시 바뀝니다.
     db.ref('lens_mgmt/rules').on('value', function(snap) {
@@ -1201,13 +1203,16 @@
             setTimeout(() => {
                 const cell = document.getElementById(`cell-${dataKey}`);
                 if(cell) {
-                    cell.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                    cell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
                     cell.classList.add('ring-4', 'ring-blue-400', 'ring-offset-2', 'z-50', 'relative', 'scale-125');
                     setTimeout(() => {
                         cell.classList.remove('ring-4', 'ring-blue-400', 'ring-offset-2', 'z-50', 'relative', 'scale-125');
                     }, 500);
                 }
             }, 100);
+
+            if (stockUndoStack.length >= 20) stockUndoStack.shift();
+            stockUndoStack.push(JSON.parse(JSON.stringify(stockData)));
         }
     }
 
@@ -1244,9 +1249,7 @@
 
     // 1. 업체 목록 및 드롭다운 렌더링
     function renderCompanyLists() {
-        const listArea = document.getElementById('companyManageList');
-        
-        // 업체 관리 버튼들 생성
+        var listArea = document.getElementById('companyManageList');
         listArea.innerHTML = companyList.map(name => `
             <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden shadow-sm">
                 <span class="px-3 py-1.5 font-bold text-sm text-slate-700">${name}</span>
@@ -1511,6 +1514,19 @@
             text += `\n`;
         }
         return text.trim();
+    }
+
+    function undoStockScan() {
+    if (stockUndoStack.length === 0) return alert("되돌릴 기록이 없습니다.");
+    
+    // 바구니에서 가장 최근 기록 꺼내기
+    stockData = stockUndoStack.pop();
+    
+    // 화면 갱신
+    renderStockGrid();
+    
+    // 로컬스토리지 임시저장도 함께 갱신
+    localStorage.setItem('tempStockV6', JSON.stringify(stockData));
     }
 
     // 초기 실행
