@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>아이젠트리 렌즈 관리 v5.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -321,13 +323,9 @@
 
 </div>
 
-<script type="module">
-    // 1. 파이어베이스 엔진 불러오기
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+<script>
 
-    // 2. 파이어베이스 주소 설정 (안경사님 매장 설정값)
-    const firebaseConfig = {
+    var firebaseConfig = {
         apiKey: "AIzaSyAFHrLjLRLlWz_auxGEFfHtRtgXInhhGYI",
         authDomain: "eyegentry-5c7de.firebaseapp.com",
         databaseURL: "https://eyegentry-5c7de-default-rtdb.firebaseio.com",
@@ -336,54 +334,35 @@
         messagingSenderId: "772851251300",
         appId: "1:772851251300:web:20204a7629307b0c048771"
     };
+    firebase.initializeApp(firebaseConfig);
+    var db = firebase.database();
 
-    // 3. 엔진 가동 및 DB 연결
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
 
-    // 4. [여기가 전역변수 구간] 
-    // 브라우저(window)에 "이 변수랑 함수는 공용이야!"라고 선언하는 겁니다.
-    window.rules = [];           // 바코드 규칙용 전역변수
-    window.companyList = [];     // 업체 목록용 전역변수
-    window.currentOrders = [];   // 현재 찍고 있는 주문 목록용 전역변수
-    window.scanCounter = 0;      // 스캔 번호 매기기용 전역변수
-    window.activeRecordId = null; // 현재 검수 중인 날짜 ID
-
-    // 5. 서버에서 실시간으로 데이터 가져오기 (연결통로 확보)
-    onValue(ref(db, 'lens_mgmt/rules'), (snapshot) => {
-        window.rules = snapshot.val() || [];
-        if(typeof renderRules === 'function') renderRules(); // 규칙 화면 갱신
-    });
-
-    onValue(ref(db, 'lens_mgmt/companies'), (snapshot) => {
-        window.companyList = snapshot.val() || ['신성옵틱', '하이비전', '은하옵틱', '자이스'];
-        if(typeof renderCompanyLists === 'function') renderCompanyLists(); // 업체 목록 갱신
-    });
-
-    // 6. [주요 함수들 전역 등록]
-    // 이렇게 window.을 붙여야 버튼 onclick이 이 함수들을 찾아낼 수 있습니다.
-    window.confirmOrder = async () => { /* 주문 저장 로직... */ };
-    window.saveRule = () => { /* 규칙 저장 로직... */ };
-    window.loadHistoryByDate = async (dateStr) => { /* 기록 불러오기 로직... */ };
-    window.handleUnifiedScan = (e) => { /* 검수 스캔 로직... */ };
-    
     // 전역 변수
-    let rules = JSON.parse(localStorage.getItem('eyeRulesV4')) || [];
+    let rules = [];
+    let companyList = ['신성옵틱', '하이비전', '은하옵틱', '자이스'];
     let currentOrders = [];
     let activeRecordId = null;
-    let undoStack = []; // 스캔 실수를 되돌리기 위해 이전 기록들을 저장하는 '타임머신 바구니'입니다.
-    let currentFilterCompany = ""; // 현재 어떤 안경렌즈 업체를 골라서 보고 있는지 기억하는 '메모장'입니다.
-    let stockData = JSON.parse(localStorage.getItem('tempStockV6')) || {}; 
-    let currentStockSign = '-';
-    // 업체 목록 로드 (없으면 기본값 사용)
-    let companyList = JSON.parse(localStorage.getItem('eyeCompanies')) || ['신성옵틱', '하이비전', '은하옵틱', '자이스'];
-    // 페이지 로드 시 실행할 함수들에 추가
-    window.onload = () => {
-        document.getElementById('mainScanner').focus();
-        renderCompanyLists(); // 업체 목록 화면에 그리기
-    };
+    let undoStack = [];
+    let currentFilterCompany = "";
     let editingRuleId = null;
     let scanCounter = 0;
+        
+    // [3번 상세] 실시간 데이터 동기화
+    // 서버의 'rules' 방에 변화가 생기면 내 컴퓨터의 rules 변수도 즉시 바뀝니다.
+    db.ref('lens_mgmt/rules').on('value', function(snap) {
+        rules = snap.val() || []; // 데이터가 없으면 빈 배열
+        renderRules();           // 데이터가 왔으니 화면에 규칙 리스트를 그립니다.
+    });
+
+    // 서버의 'companies' 방과 연결
+    db.ref('lens_mgmt/companies').on('value', function(snap) {
+        if(snap.exists()) {
+            companyList = snap.val();
+            renderCompanyLists(); // 업체 목록 드롭다운들을 갱신합니다.
+        }
+    });
+
 
     // 탭 전환
     function switchTab(tabId) {
@@ -538,28 +517,27 @@
     }
 
     function loadHistoryByDate(dateStr) {
-        const history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
-        const targetDate = new Date(dateStr).toLocaleDateString();
-        const record = history.find(h => h.date === targetDate);
-
-        if(record) {
-            activeRecordId = record.id;
-            const companies = [...new Set(record.items.map(i => i.company))];
-            const filterSelect = document.getElementById('companyFilter');
-            filterSelect.disabled = false;
-            filterSelect.innerHTML = `<option value="">전체 업체 (${companies.length})</option>` + 
-                companies.map(c => `<option value="${c}">${c}</option>`).join('');
-            
-            document.getElementById('unifiedScanner').disabled = false;
-            currentFilterCompany = "";
-            renderInspectionUI(record);
-        } else {
-            activeRecordId = null;
-            document.getElementById('companyFilter').disabled = true;
-            document.getElementById('unifiedScanner').disabled = true;
-            document.getElementById('historySummaryArea').innerHTML = `<p class="text-slate-300 italic text-center py-20 text-xs">기록 없음</p>`;
-            document.getElementById('inspectionResultArea').innerHTML = `<div class="py-32 text-center text-slate-300 italic font-black text-2xl">해당 날짜의 기록이 없습니다.</div>`;
-        }
+        // 선택한 날짜를 서버 주소 형식(2026-04-20)으로 변환
+        var formattedId = new Date(dateStr).toLocaleDateString('ko-KR').replace(/\. /g, '-').replace(/\./g, '');
+        
+        // 서버에 해당 날짜 데이터를 '한 번만' 요청
+        db.ref('lens_mgmt/history/' + formattedId).once('value').then(function(snap) {
+            if(snap.exists()){
+                var record = snap.val();
+                activeRecordId = formattedId; // 현재 검수 중인 날짜로 설정
+                
+                // 필터 및 스캐너 활성화
+                document.getElementById('companyFilter').disabled = false;
+                document.getElementById('unifiedScanner').disabled = false;
+                
+                renderInspectionUI(record); // 화면에 검수 리스트 그리기
+            } else {
+                // 데이터가 없을 때의 처리
+                activeRecordId = null;
+                document.getElementById('inspectionResultArea').innerHTML = 
+                    `<div class="py-32 text-center text-slate-300 font-black text-xl">해당 날짜에는 저장된 기록이 없습니다.</div>`;
+            }
+        });
     }
 
     function loadHistoryById(id) {
@@ -753,14 +731,15 @@
         updateText('previewResult', `S ${sRes > 0 ? '+' : ''}${sRes} C ${cRes > 0 ? '+' : ''}${cRes}`);
     }
 
+    // [수정 3] 바코드 규칙을 서버(클라우드)에 저장하기
     function saveRule() {
         const code = document.getElementById('testBarcode').value;
-        if(!code) return alert("바코드를 먼저 찍어주세요.");
+        if(!code) return alert("샘플 바코드를 먼저 찍어주세요.");
 
         const newRule = {
-            id: editingRuleId || Date.now(), // 수정 중이면 기존 ID, 아니면 새 ID
+            id: editingRuleId || Date.now(),
             prefix: code.substring(0, 5),
-            length: code.length, // [추가] 바코드 전체 길이를 저장
+            length: code.length,
             company: document.getElementById('selCompany').value,
             index: document.getElementById('selIndex').value,
             design: document.getElementById('selDesign').value,
@@ -773,16 +752,16 @@
 
         if(editingRuleId) {
             rules = rules.map(r => r.id === editingRuleId ? newRule : r);
-            editingRuleId = null; // 수정 완료 후 초기화
-            document.getElementById('saveRuleBtn').innerText = "이 설정을 새 규칙으로 저장";
+            editingRuleId = null;
         } else {
             rules.push(newRule);
         }
 
-        localStorage.setItem('eyeRulesV4', JSON.stringify(rules));
-        renderRules();
-        alert("저장되었습니다.");
-        document.getElementById('testBarcode').value = "";
+        // 서버에 저장 (가격표와 같은 방식)
+        db.ref('lens_mgmt/rules').set(rules).then(() => {
+            alert("규칙이 클라우드 서버에 저장되었습니다!");
+            document.getElementById('testBarcode').value = "";
+        });
     }
 
     function renderRules() {
@@ -860,7 +839,13 @@
         list.innerHTML = html;
     }
 
-    function deleteRule(id) { if(confirm("삭제할까요?")) { rules = rules.filter(r => r.id !== id); localStorage.setItem('eyeRulesV4', JSON.stringify(rules)); renderRules(); } }
+    // 1. 규칙 삭제 기능
+    function deleteRule(id) { 
+        if(confirm("정말 삭제할까요?")) { 
+            rules = rules.filter(r => r.id !== id); 
+            db.ref('lens_mgmt/rules').set(rules); // 서버 업데이트
+        } 
+    }
 
     function updateQty(index, val) { 
         const n = parseInt(val); 
@@ -869,39 +854,43 @@
     }
 
     function confirmOrder() {
-        if(currentOrders.length === 0) return alert("저장할 내역이 없습니다.");
+        if (currentOrders.length === 0) return alert("저장할 내역이 없습니다.");
         
-        let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
-        const todayStr = new Date().toLocaleDateString();
-        
-        // 1. 해당 날짜의 기존 기록 찾기
-        let dayRecord = history.find(h => h.date === todayStr);
+        // 1. 오늘 날짜 주소 만들기 (예: 2026-04-20)
+        var todayStr = new Date().toLocaleDateString('ko-KR').replace(/\. /g, '-').replace(/\./g, '');
+        var historyRef = db.ref('lens_mgmt/history/' + todayStr);
 
-        if (dayRecord) {
-            // 2. 이미 기록이 있다면 항목 합치기
-            currentOrders.forEach(newObj => {
-                const existing = dayRecord.items.find(oldObj => oldObj.code === newObj.code);
-                if (existing) {
-                    existing.qty += newObj.qty; // 같은 렌즈면 수량 플러스
+        // 2. 서버에서 오늘 이미 저장된 데이터가 있는지 '한 번만' 확인합니다.
+        historyRef.once('value').then(function(snap) {
+            var items = [];
+            if (snap.exists()) {
+                items = snap.val().items; // 이미 저장된 렌즈 목록이 있다면 가져옴
+            }
+
+            // 3. [합치기 로직] 지금 스캔한 것들을 기존 목록에 더합니다.
+            currentOrders.forEach(function(newObj) {
+                var exist = items.find(function(o) { return o.code === newObj.code; });
+                if (exist) {
+                    exist.qty += newObj.qty; // 같은 렌즈가 이미 있다면 수량만 플러스
                 } else {
-                    dayRecord.items.push({...newObj}); // 새로운 렌즈면 추가
+                    items.push(newObj); // 처음 찍는 렌즈라면 목록에 새로 추가
                 }
             });
-        } else {
-            // 3. 해당 날짜 첫 저장이라면 새로 생성
-            history.unshift({
+
+            // 4. 합쳐진 최종 데이터를 서버에 덮어씌웁니다.
+            historyRef.set({
                 id: Date.now(),
                 date: todayStr,
-                items: [...currentOrders],
-                unregisteredItems: []
+                items: items,
+                unregisteredItems: snap.exists() ? (snap.val().unregisteredItems || []) : [] 
+            }).then(function() {
+                // 5. 완료 후 내 화면 청소
+                currentOrders = [];
+                scanCounter = 0;
+                renderOrderTable();
+                alert("서버(Cloud)에 오늘치 주문이 통합 저장되었습니다!");
             });
-        }
-        
-        localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
-        currentOrders = [];
-        scanCounter = 0;
-        renderOrderTable();
-        alert("오늘의 기록에 통합 저장되었습니다.");
+        });
     }
 
     function handleUnifiedScan(event) {
@@ -1259,7 +1248,8 @@
         });
     }
 
-    // 2. 업체 추가
+
+    // 3. 업체 추가 기능 (saveCompanyData를 사용하게 수정)
     function addCompany() {
         const nameInput = document.getElementById('newCompanyName');
         const name = nameInput.value.trim();
@@ -1267,7 +1257,7 @@
         if (companyList.includes(name)) return alert("이미 등록된 업체입니다.");
 
         companyList.push(name);
-        saveCompanyData();
+        saveCompanyData(); // 여기서 서버로 전송됩니다.
         nameInput.value = '';
     }
 
@@ -1320,10 +1310,9 @@
         saveCompanyData();
     }
 
-    // 5. 저장 공통 함수
+    // 2. 업체 데이터 저장 공통 함수
     function saveCompanyData() {
-        localStorage.setItem('eyeCompanies', JSON.stringify(companyList));
-        renderCompanyLists();
+        db.ref('lens_mgmt/companies').set(companyList);
     }
 
     function editRule(id) {
@@ -1505,9 +1494,20 @@
 
     // 초기 실행
     renderRules();
+    // [수정 2] 페이지가 열리면 바로 바코드 찍을 준비 하기
     window.onload = () => {
-    document.getElementById('mainScanner').focus();
-};
+        const scanner = document.getElementById('mainScanner');
+        if(scanner) {
+            scanner.focus(); // 커서 자동 깜빡임
+            scanner.addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') {
+                    processScan(e.target.value); // 엔터 누르면 스캔 실행
+                    e.target.value = ''; // 입력창 비우기
+                }
+            });
+        }
+    };
+
 </script>
 </body>
 </html>
