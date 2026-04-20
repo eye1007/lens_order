@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>아이젠트리 렌즈 관리 v5.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .active-tab { border-bottom: 4px solid #2563eb; color: #2563eb; font-weight: bold; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 10px; }
+        td {scroll-margin-top: 400px;}
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+
+<nav class="bg-slate-700 shadow-xl mb-6 sticky top-0 z-50 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto flex">
+        <button onclick="switchTab('order')" id="tabBtn-order" class="flex-1 py-4 text-center active-tab font-bold text-lg text-slate-200 transition-all">📦 주문/스캔 관리</button>
+        <button onclick="switchTab('history')" id="tabBtn-history" class="flex-1 py-4 text-center font-bold text-lg text-slate-200 transition-all">📝 기록/검수</button>
+        <button onclick="switchTab('stock')" id="tabBtn-stock" class="flex-1 py-4 text-center font-bold text-lg text-slate-200 transition-all">📊 재고조사</button>
+        <button onclick="switchTab('manage')" id="tabBtn-manage" class="flex-1 py-4 text-center font-bold text-lg text-slate-200 transition-all">⚙️ 바코드 규칙 설정</button>
+    </div>
+</nav>
+
+<div class="max-w-[1600px] mx-auto px-6 pb-10">
+
+    <div id="tab-order" class="tab-content active">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-8 bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
+                <div class="mb-8">
+                    <label class="block text-sm font-black text-slate-400 mb-2 ml-1 uppercase tracking-widest">Barcode Scanner</label>
+                    <input type="text" id="mainScanner" placeholder="렌즈 바코드를 찍으세요" autocomplete="off"
+                        class="w-full border-4 border-blue-50 p-5 rounded-2xl text-3xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none font-mono transition-all shadow-inner">
+                </div>
+                
+                <div class="overflow-hidden rounded-2xl border border-slate-100">
+                    <table class="w-full text-center border-collapse">
+                        <thead class="bg-slate-50 text-slate-500 text-sm">
+                            <tr>
+                                <th class="p-4 border-b font-bold w-16">No.</th>
+                                <th class="p-4 border-b font-bold">업체</th>
+                                <th class="p-4 border-b font-bold">상세 정보</th>
+                                <th class="p-4 border-b font-bold text-left" colspan="2">도수 정보 (++)/(-+)</th>
+                                <th class="p-4 border-b font-bold">수량</th>
+                                <th class="p-4 border-b font-bold">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderListBody" class="divide-y divide-slate-50"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="lg:col-span-4 bg-white pt-5 px-6 pb-6 rounded-[40px] shadow-xl border border-slate-200 text-slate-800 self-start sticky top-28 h-[calc(100vh-150px)] flex flex-col">
+                <h3 class="text-slate-800 text-lg font-black mb-3 flex items-center border-b border-slate-100 pb-2">
+                    <span class="mr-2 text-lg">📋</span> 실시간 주문 요약
+                </h3>
+                <div id="simplifiedView" class="custom-scrollbar overflow-y-auto pr-2 flex-1 space-y-2">
+                    <p class="text-slate-400 italic">스캔을 시작하면 요약본이 표시됩니다.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mt-6">
+                    <button onclick="copySummaryToClipboard()" class="bg-slate-800 hover:bg-black text-white py-4 rounded-2xl text-lg font-black shadow-lg transition-all active:scale-95 flex flex-col items-center justify-center leading-tight">
+                        <span class="text-xs opacity-70 mb-1">카톡 전송용</span>
+                        📋 요약 복사
+                    </button>
+                    <button onclick="confirmOrder()" class="bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl text-lg font-black shadow-lg transition-all active:scale-95 flex flex-col items-center justify-center leading-tight">
+                        <span class="text-xs opacity-70 mb-1">기록 보관용</span>
+                        💾 주문 저장
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-history" class="tab-content">
+        <div class="max-w-[1600px] mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                <div class="lg:col-span-4 bg-white p-6 rounded-[30px] shadow-xl border border-slate-100 flex flex-col">
+                    <h3 class="text-base font-black text-slate-800 mb-4">📅 주문 기록 달력</h3>
+                    <div id="visualCalendar" class="grid grid-cols-7 gap-2 text-center text-sm font-bold flex-1"></div>
+                </div>
+
+                <div class="lg:col-span-4 bg-slate-800 p-6 rounded-[30px] shadow-2xl text-white border-b-[10px] border-blue-600 flex flex-col gap-4 justify-center">
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 mb-1 uppercase">1. 날짜 선택</label>
+                        <input type="date" id="inspectDateSelect" onchange="loadHistoryByDate(this.value)" class="w-full p-3 bg-slate-700 rounded-xl text-base font-black outline-none border border-slate-600 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 mb-1 uppercase">2. 업체 필터</label>
+                        <select id="companyFilter" onchange="filterByCompany()" disabled class="w-full p-3 bg-slate-700 rounded-xl text-base font-black border border-slate-600 outline-none"></select>
+                    </div>
+                    <div class="pt-3 border-t border-slate-700">
+                        <label class="block text-xs font-black text-yellow-400 mb-1 uppercase">3. 검수 스캔</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="unifiedScanner" placeholder="스캔" disabled onkeypress="handleUnifiedScan(event)" autocomplete="off" class="flex-1 p-3 bg-slate-900 border-2 border-slate-600 rounded-xl text-white font-mono text-lg outline-none focus:border-blue-500">
+                            <button onclick="undoScan()" class="bg-amber-500 px-4 rounded-xl active:scale-95"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-4 bg-white p-6 rounded-[30px] shadow-xl border border-slate-100 flex flex-col h-[380px]">
+                    <div class="flex justify-between items-center mb-4 border-b pb-3 shrink-0">
+                        <h4 class="font-black text-slate-800 text-base flex items-center">📋 일별 통합 요약</h4>
+                        <div id="historyCopyBtnArea"></div>
+                    </div>
+                    <div id="historySummaryArea" class="custom-scrollbar overflow-y-auto flex-1 pr-1 text-sm font-bold">
+                        <p class="text-slate-300 italic text-center py-20 text-xs">날짜를 선택하세요.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="inspectionResultArea" class="mt-8">
+                <div class="py-32 text-center text-slate-300">
+                    <div class="text-8xl mb-6 opacity-20">🎯</div>
+                    <p class="text-2xl italic font-bold">좌측 달력에서 날짜를 선택해주세요.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-stock" class="tab-content">
+        <div class="max-w-full mx-auto px-6 space-y-4">
+            <div class="bg-white py-3 px-6 rounded-[20px] shadow-md border border-slate-200 sticky top-14 z-40">
+                <div class="flex flex-col lg:flex-row gap-6 items-end">
+                    
+                    <div class="lg:w-1/4">
+                        <label class="block text-[10px] font-black text-slate-400 mb-1 uppercase">1. 업체 / 굴절률 / 설계 / 코팅 종류</label>
+                        <div class="grid grid-cols-2 gap-1 mb-1">
+                            <select id="stockCompany" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
+                                <option>신성옵틱</option><option>하이비전</option><option>은하옵틱</option><option>자이스</option>
+                            </select>
+                            <select id="stockIndex" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
+                                <option>1.56</option><option>1.60</option><option>1.67</option><option>1.74</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1">
+                            <select id="stockDesign" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
+                                <option>구면</option><option selected>비구면</option><option>양면비구면</option>
+                            </select>
+                            <select id="stockType" class="p-2 border rounded-lg font-bold text-xs bg-slate-50 outline-none" onchange="renderStockGrid()">
+                                <option>멀티</option><option selected>청광</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="lg:w-1/5">
+                        <label class="block text-[10px] font-black text-blue-600 mb-1 uppercase">2. 도수 방식</label>
+                        <div class="flex gap-1">
+                            <button onclick="changeStockSign('-')" id="btn-stock-minus" class="flex-1 py-2 rounded-lg font-black text-xs bg-blue-600 text-white shadow-sm">근시(-)</button>
+                            <button onclick="changeStockSign('+')" id="btn-stock-plus" class="flex-1 py-2 rounded-lg font-black text-xs bg-slate-100 text-slate-400">원시(+)</button>
+                            <button onclick="changeStockSign('mixed')" id="btn-stock-mixed" class="flex-1 py-2 rounded-lg font-black text-xs bg-slate-100 text-slate-400">혼복(+-)</button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex gap-3 items-end">
+                        <div class="flex-1">
+                            <label class="block text-[10px] font-black text-red-500 mb-1 uppercase">3. 재고 바코드 스캔 (연속 스캔)</label>
+                            <input type="text" id="stockScanner" placeholder="바코드를 찍으면 해당 칸으로 이동합니다" 
+                                onkeypress="handleStockScan(event)" autocomplete="off"
+                                class="w-full p-4 border-2 border-red-50 rounded-xl text-xl font-black focus:border-red-400 outline-none transition-all">
+                        </div>
+                        <div class="flex flex-col gap-1 w-24">
+                            <button onclick="saveStockTemp()" class="h-9 bg-slate-800 text-white rounded-lg text-xs font-black hover:bg-black transition-all">임시 저장</button>
+                            <button onclick="resetStock()" class="h-9 bg-slate-100 text-slate-400 rounded-lg text-xs font-black hover:text-red-500 transition-all">전체 초기화</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-[20px] shadow-xl border border-slate-200 overflow-x-auto custom-scrollbar">
+                <h4 class="text-lg font-black text-slate-800 mb-4 flex justify-between items-center">
+                    <span id="stockTitle">📊 재고 현황판 
+                        <span class="ml-4 text-[10px] font-normal text-slate-400">
+                            <span class="bg-blue-500 text-white px-1.5 rounded">1개</span>
+                            <span class="bg-green-500 text-white px-1.5 rounded">2개</span>
+                            <span class="bg-orange-400 text-white px-1.5 rounded">3개</span>
+                            <span class="bg-red-600 text-white px-1.5 rounded">4+</span>
+                        </span>
+                    </span>
+                    <span id="stockTotalCount" class="text-base text-blue-600 font-black">Total: 0개</span>
+                </h4>
+                <div id="stockGridArea" class="min-w-[1200px]"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-manage" class="tab-content">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8"> 
+            <div class="lg:col-span-5 bg-white p-5 rounded-3xl shadow-lg border-t-8 border-blue-500">
+                <h3 class="text-2xl font-black mb-8 flex items-center"><span class="mr-2">🔧</span> 신규 바코드 규칙 등록</h3>
+                <div class="space-y-6">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase ml-1">샘플 바코드 스캔</label>
+                        <input type="text" id="testBarcode" placeholder="바코드를 찍어주세요" autocomplete="off"
+                            class="w-full border-2 border-slate-100 p-4 rounded-xl bg-slate-50 font-mono text-xl focus:bg-white focus:border-blue-500 outline-none" oninput="runLivePreview()">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase ml-1">업체명</label>
+                            <select id="selCompany" class="w-full border-2 border-slate-100 p-4 rounded-xl appearance-none bg-white font-bold">
+                                <option>신성옵틱</option><option>하이비전</option><option>은하옵틱</option><option>자이스</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase ml-1">굴절률</label>
+                            <select id="selIndex" class="w-full border-2 border-slate-100 p-4 rounded-xl appearance-none bg-white font-bold">
+                                <option>1.56</option><option>1.60</option><option>1.67</option><option>1.74</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase ml-1">설계</label>
+                            <select id="selDesign" class="w-full border-2 border-slate-100 p-4 rounded-xl appearance-none bg-white font-bold">
+                                <option>구면</option><option selected>비구면</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase ml-1">코팅 종류</label>
+                            <select id="selType" class="w-full border-2 border-slate-100 p-4 rounded-xl appearance-none bg-white font-bold">
+                                <option>멀티</option><option selected>청광</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 p-2 rounded-2xl border-2 border-blue-100">
+                        <label class="block text-xs font-black mb-4 text-blue-800 uppercase tracking-widest text-center">도수 처리 방식 선택</label>
+                        <div class="flex gap-4">
+                            <label class="flex-1 bg-white p-4 rounded-xl border-2 border-blue-200 cursor-pointer text-center hover:border-blue-500 transition-all">
+                                <input type="radio" name="lens_sign" value="-" checked onchange="runLivePreview()" class="hidden peer">
+                                <span class="text-sm font-bold text-slate-400 peer-checked:text-blue-600 block">🔵 근시(-)</span>
+                            </label>
+                            <label class="flex-1 bg-white p-4 rounded-xl border-2 border-red-100 cursor-pointer text-center hover:border-red-500 transition-all">
+                                <input type="radio" name="lens_sign" value="+" onchange="runLivePreview()" class="hidden peer">
+                                <span class="text-sm font-bold text-slate-400 peer-checked:text-red-600 block">🔴 원시(++)</span>
+                            </label>
+                            <label class="flex-1 bg-white p-4 rounded-xl border-2 border-purple-100 cursor-pointer text-center hover:border-purple-500 transition-all">
+                                <input type="radio" name="lens_sign" value="mixed" onchange="runLivePreview()" class="hidden peer">
+                                <span class="text-sm font-bold text-slate-400 peer-checked:text-purple-600 block">🟣 혼복(+-)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 mb-4">
+                        <div class="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100">
+                            <label class="block text-xs font-black text-indigo-500 uppercase tracking-widest mb-2 text-center">도수 산출 방식 (은하옵틱 등 대응)</label>
+                            <select id="calcMode" class="w-full p-3 bg-white border-2 border-indigo-200 rounded-xl font-bold text-slate-700 outline-none focus:border-indigo-500" onchange="runLivePreview()">
+                                <option value="normal">일반 방식 (숫자 × 0.01)</option>
+                                <option value="step25">은하 방식 (끝자리 0,2,5,7 → 00,25,50,75)</option>
+                            </select>
+                            <p class="text-[10px] text-indigo-400 mt-2 text-center">* 은하 1.74는 '은하 방식'을 선택하고 범위를 SPH(3자리), CYL(2자리)로 잡으세요.</p>
+                        </div>
+                    </div>
+
+
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-slate-50 p-4 rounded-xl border-2 border-slate-100 text-center">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">품목(시작~끝)</label>
+                            <div class="flex gap-1 mt-2 mb-2">
+                                <input type="number" id="pS" value="0" class="w-full p-1 border rounded text-center font-mono" oninput="runLivePreview()">
+                                <input type="number" id="pE" value="5" class="w-full p-1 border rounded text-center font-mono" oninput="syncIndex('pE', 'sS')">
+                            </div>
+                            <p id="rawItem" class="text-[11px] font-mono text-blue-600 font-bold italic">추출: -</p>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border-2 border-slate-100 text-center">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">SPH(시작~끝)</label>
+                            <div class="flex gap-1 mt-2 mb-2">
+                                <input type="number" id="sS" value="5" class="w-full p-1 border rounded text-center font-mono" oninput="syncIndex('sS', 'pE')">
+                                <input type="number" id="sE" value="9" class="w-full p-1 border rounded text-center font-mono" oninput="syncIndex('sE', 'cS')">
+                            </div>
+                            <p id="rawSph" class="text-[11px] font-mono text-indigo-600 font-bold italic">추출: -</p>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border-2 border-slate-100 text-center">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">CYL(시작~끝)</label>
+                            <div class="flex gap-1 mt-2 mb-2">
+                                <input type="number" id="cS" value="9" class="w-full p-1 border rounded text-center font-mono" oninput="syncIndex('cS', 'sE')">
+                                <input type="number" id="cE" value="12" class="w-full p-1 border rounded text-center font-mono" oninput="runLivePreview()">
+                            </div>
+                            <p id="rawCyl" class="text-[11px] font-mono text-indigo-600 font-bold italic">추출: -</p>
+                        </div>
+                    </div>
+
+                    <div class="p-6 bg-slate-900 rounded-2xl text-center shadow-inner">
+                        <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">실시간 인식 결과</p>
+                        <p class="font-mono font-black text-3xl text-green-400" id="previewResult">S -0.00 C -0.00</p>
+                    </div>
+
+                    <button id="saveRuleBtn" onclick="saveRule()" class="w-full bg-slate-800 hover:bg-black text-white p-3 rounded-2xl font-black text-lg shadow-lg transition-all active:scale-95">
+                        이 설정을 새 규칙으로 저장
+                    </button>
+                </div>
+            </div>
+
+            <div class="lg:col-span-7 bg-white p-8 rounded-3xl shadow-lg border border-slate-100">
+                <h3 class="text-2xl font-black mb-8 flex items-center"><span class="mr-2">📋</span> 등록된 업체별 규칙</h3>
+                <div id="ruleListDisplay" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[800px] overflow-y-auto pr-4 custom-scrollbar"></div>
+            </div>
+                        <div class="lg:col-span-12 bg-slate-100 p-6 rounded-3xl mb-8 border-2 border-slate-200">
+                <h3 class="text-xl font-black mb-4 flex items-center text-slate-700">
+                    <span class="mr-2">🏢</span> 거래처(업체명) 관리
+                </h3>
+                <div class="flex flex-wrap gap-3 items-center">
+                    <div class="flex gap-2 bg-white p-2 rounded-xl shadow-sm border">
+                        <input type="text" id="newCompanyName" placeholder="새 업체명 입력" class="p-2 outline-none font-bold text-sm w-40">
+                        <button onclick="addCompany()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-black text-sm hover:bg-blue-700">추가</button>
+                    </div>
+                    
+                    <div id="companyManageList" class="flex flex-wrap gap-2">
+                        </div>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-3">* 업체명을 수정하면 기존에 등록된 바코드 규칙의 업체명도 한꺼번에 바뀝니다.</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+    // 1. 파이어베이스 엔진 불러오기
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+
+    // 2. 파이어베이스 주소 설정 (안경사님 매장 설정값)
+    const firebaseConfig = {
+        apiKey: "AIzaSyAFHrLjLRLlWz_auxGEFfHtRtgXInhhGYI",
+        authDomain: "eyegentry-5c7de.firebaseapp.com",
+        databaseURL: "https://eyegentry-5c7de-default-rtdb.firebaseio.com",
+        projectId: "eyegentry-5c7de",
+        storageBucket: "eyegentry-5c7de.firebasestorage.app",
+        messagingSenderId: "772851251300",
+        appId: "1:772851251300:web:20204a7629307b0c048771"
+    };
+
+    // 3. 엔진 가동 및 DB 연결
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // 4. [여기가 전역변수 구간] 
+    // 브라우저(window)에 "이 변수랑 함수는 공용이야!"라고 선언하는 겁니다.
+    window.rules = [];           // 바코드 규칙용 전역변수
+    window.companyList = [];     // 업체 목록용 전역변수
+    window.currentOrders = [];   // 현재 찍고 있는 주문 목록용 전역변수
+    window.scanCounter = 0;      // 스캔 번호 매기기용 전역변수
+    window.activeRecordId = null; // 현재 검수 중인 날짜 ID
+
+    // 5. 서버에서 실시간으로 데이터 가져오기 (연결통로 확보)
+    onValue(ref(db, 'lens_mgmt/rules'), (snapshot) => {
+        window.rules = snapshot.val() || [];
+        if(typeof renderRules === 'function') renderRules(); // 규칙 화면 갱신
+    });
+
+    onValue(ref(db, 'lens_mgmt/companies'), (snapshot) => {
+        window.companyList = snapshot.val() || ['신성옵틱', '하이비전', '은하옵틱', '자이스'];
+        if(typeof renderCompanyLists === 'function') renderCompanyLists(); // 업체 목록 갱신
+    });
+
+    // 6. [주요 함수들 전역 등록]
+    // 이렇게 window.을 붙여야 버튼 onclick이 이 함수들을 찾아낼 수 있습니다.
+    window.confirmOrder = async () => { /* 주문 저장 로직... */ };
+    window.saveRule = () => { /* 규칙 저장 로직... */ };
+    window.loadHistoryByDate = async (dateStr) => { /* 기록 불러오기 로직... */ };
+    window.handleUnifiedScan = (e) => { /* 검수 스캔 로직... */ };
+    
+    // 전역 변수
+    let rules = JSON.parse(localStorage.getItem('eyeRulesV4')) || [];
+    let currentOrders = [];
+    let activeRecordId = null;
+    let undoStack = []; // 스캔 실수를 되돌리기 위해 이전 기록들을 저장하는 '타임머신 바구니'입니다.
+    let currentFilterCompany = ""; // 현재 어떤 안경렌즈 업체를 골라서 보고 있는지 기억하는 '메모장'입니다.
+    let stockData = JSON.parse(localStorage.getItem('tempStockV6')) || {}; 
+    let currentStockSign = '-';
+    // 업체 목록 로드 (없으면 기본값 사용)
+    let companyList = JSON.parse(localStorage.getItem('eyeCompanies')) || ['신성옵틱', '하이비전', '은하옵틱', '자이스'];
+    // 페이지 로드 시 실행할 함수들에 추가
+    window.onload = () => {
+        document.getElementById('mainScanner').focus();
+        renderCompanyLists(); // 업체 목록 화면에 그리기
+    };
+    let editingRuleId = null;
+    let scanCounter = 0;
+
+    // 탭 전환
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active-tab'));
+        document.getElementById('tabBtn-' + tabId).classList.add('active-tab');
+        
+        if(tabId === 'manage') renderRules();
+        if(tabId === 'stock') {
+            renderStockGrid();
+            // 0.05초 뒤에 재고 스캐너에 강제 포커스 (탭 전환 애니메이션 고려)
+            setTimeout(() => document.getElementById('stockScanner').focus(), 50);
+        }
+        if(tabId === 'history') {
+            renderHistory();
+            initHistoryPage();
+        }
+        // 주문 탭 포커스도 유지
+        if(tabId === 'order') {
+            setTimeout(() => document.getElementById('mainScanner').focus(), 50);
+        }
+    }
+
+    // [로직 1] 도수 표기 변환기 (깔끔한 버전)
+        function getPowerText(sph, cyl, signType) {
+            let s = parseFloat(sph);
+            let c = parseFloat(cyl);
+
+            // 괄호 안의 변환 도수(transS, transC) 계산 로직을 삭제하여 더 가볍게 만들었습니다.
+            if (signType === '+') { // 신성 원시++
+                return `<span class="text-red-500 font-black">S +${Math.abs(s).toFixed(2)} C +${Math.abs(c).toFixed(2)}</span>`;
+            } else if (signType === 'mixed') { // 하이비전 혼복+-
+                return `<span class="text-red-500 font-black">S +${Math.abs(s).toFixed(2)} C -${Math.abs(c).toFixed(2)}</span>`;
+            } else { // 근시 --
+                return `<span class="text-blue-600 font-black">S ${s.toFixed(2)} C ${c.toFixed(2)}</span>`;
+            }
+        }
+
+    // [로직 2] 메인 스캔 처리
+    function processScan(code) {
+        // 1. 바코드 규칙 매칭 (접두사 + 전체 자릿수까지 확인)
+        const rule = rules.find(r => code.startsWith(r.prefix) && code.length === r.length);
+
+        if (!rule) {
+            if (confirm("등록되지 않은 바코드(또는 자릿수 불일치)입니다. 규칙 설정으로 이동할까요?")) {
+                switchTab('manage');
+                document.getElementById('testBarcode').value = code;
+                runLivePreview();
+            }
+            return;
+        }
+
+        // 2. 도수 산출을 위한 부호 결정
+        let sMult = -1, cMult = -1;
+        if (rule.signType === '+') { sMult = 1; cMult = 1; }
+        else if (rule.signType === 'mixed') { sMult = 1; cMult = -1; }
+
+        // 3. 바코드 데이터 추출 및 도수 계산
+        const sRaw = code.substring(rule.sphRange[0], rule.sphRange[1]);
+        const cRaw = code.substring(rule.cylRange[0], rule.cylRange[1]);
+        const sph = (calculateValue(sRaw, rule.calcMode || 'normal') * sMult).toFixed(2);
+        const cyl = (calculateValue(cRaw, rule.calcMode || 'normal') * cMult).toFixed(2);
+
+        // 4. 현재 주문 목록에 이미 찍었던 렌즈인지 확인
+        const existing = currentOrders.find(o => o.code === code);
+
+        if (existing) {
+            // 이미 목록에 있다면 수량만 증가 (번호는 유지됨)
+            existing.qty++;
+        } else {
+            // 처음 찍는 렌즈라면 새로운 순번(#)을 부여하고 목록에 추가
+            scanCounter++; 
+            currentOrders.push({
+                scanNo: scanCounter, // 찍은 순서 고유 번호
+                company: rule.company,
+                index: rule.index,
+                info: `${rule.index} ${rule.design} ${rule.type}`,
+                sph: sph,
+                cyl: cyl,
+                qty: 1,
+                code: code,
+                signType: rule.signType
+            });
+        }
+
+        // 5. 테이블 갱신 (renderOrderTable 내부에서 reverse() 처리하여 최신순 출력)
+        renderOrderTable();
+    }
+
+    // [로직 3] 메인 테이블 및 요약 렌더링
+    function renderOrderTable() {
+        const body = document.getElementById('orderListBody');
+        const summaryView = document.getElementById('simplifiedView');
+        
+        // 최신 항목이 위로 오도록 뒤집기
+        const displayOrders = [...currentOrders].reverse();
+
+        body.innerHTML = displayOrders.map((o, idx) => {
+            const realIdx = currentOrders.length - 1 - idx; 
+            return `
+                <tr class="hover:bg-blue-50/50 transition-colors">
+                    <td class="py-2 px-4 border-b font-black text-slate-400 text-sm">#${o.scanNo}</td>
+                    <td class="py-2 px-4 border-b font-black text-blue-700 text-lg">${o.company}</td>
+                    <td class="py-2 px-4 border-b text-slate-500 font-bold text-sm">${o.info}</td>
+                    <td colspan="2" class="py-2 px-4 border-b font-mono font-bold text-xl text-left">
+                        ${getPowerText(o.sph, o.cyl, o.signType)}
+                    </td>
+                    <td class="py-2 px-4 border-b">
+                        <input type="number" min="1" value="${o.qty}" onchange="updateQty(${realIdx}, this.value)"
+                            class="w-20 p-1 border-2 border-slate-200 rounded-xl text-center font-black text-xl">
+                    </td>
+                    <td class="py-2 px-4 border-b text-center">
+                        <button onclick="currentOrders.splice(${realIdx},1); renderOrderTable();" class="text-slate-300 hover:text-red-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        summaryView.innerHTML = generateGroupedSummary(currentOrders);
+    }
+
+    // [로직 4] 달력 기반 기록 시스템
+    function renderHistory() {
+        const history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const cal = document.getElementById('visualCalendar');
+        const headers = ['일', '월', '화', '수', '목', '금', '토'];
+        
+        let calHtml = headers.map(h => `<div class="text-slate-800 font-black text-lg mb-4">${h}</div>`).join('');
+
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+        const lastDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+        for(let i=0; i<firstDay; i++) calHtml += `<div></div>`;
+
+        for(let d=1; d<=lastDate; d++) {
+            const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const matchDate = new Date(dateStr).toLocaleDateString();
+            const hasOrder = history.some(h => h.date === matchDate);
+            
+            calHtml += `
+                <div onclick="document.getElementById('inspectDateSelect').value='${dateStr}';loadHistoryByDate('${dateStr}')"
+                    class="group relative py-2 px-1 rounded-2xl cursor-pointer transition-all duration-300 flex items-center justify-center text-xl font-black
+                    ${hasOrder ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 hover:scale-110 active:scale-95' : 'bg-slate-50 text-slate-600 hover:bg-slate-200'}">
+                    ${d}
+                    ${hasOrder ? '<span class="absolute top-1 right-2 w-2 h-2 bg-white rounded-full animate-pulse"></span>' : ''}
+                </div>`;
+        }
+        cal.innerHTML = calHtml;
+    }
+
+    function loadHistoryByDate(dateStr) {
+        const history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const targetDate = new Date(dateStr).toLocaleDateString();
+        const record = history.find(h => h.date === targetDate);
+
+        if(record) {
+            activeRecordId = record.id;
+            const companies = [...new Set(record.items.map(i => i.company))];
+            const filterSelect = document.getElementById('companyFilter');
+            filterSelect.disabled = false;
+            filterSelect.innerHTML = `<option value="">전체 업체 (${companies.length})</option>` + 
+                companies.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            document.getElementById('unifiedScanner').disabled = false;
+            currentFilterCompany = "";
+            renderInspectionUI(record);
+        } else {
+            activeRecordId = null;
+            document.getElementById('companyFilter').disabled = true;
+            document.getElementById('unifiedScanner').disabled = true;
+            document.getElementById('historySummaryArea').innerHTML = `<p class="text-slate-300 italic text-center py-20 text-xs">기록 없음</p>`;
+            document.getElementById('inspectionResultArea').innerHTML = `<div class="py-32 text-center text-slate-300 italic font-black text-2xl">해당 날짜의 기록이 없습니다.</div>`;
+        }
+    }
+
+    function loadHistoryById(id) {
+        const history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const record = history.find(h => h.id == id);
+        if(record) {
+            activeRecordId = record.id;
+            undoStack = []; // 새로운 회차를 선택하면 되돌리기 기록을 비웁니다.
+            
+            // 해당 주문 회차에 들어있는 업체들만 쏙쏙 뽑아냅니다.
+            const companies = [...new Set(record.items.map(item => item.company))];
+            const filterSelect = document.getElementById('companyFilter');
+            filterSelect.disabled = false; // 업체 선택창 활성화
+            filterSelect.innerHTML = `<option value="">전체 업체 (${companies.length})</option>` + 
+                companies.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            document.getElementById('unifiedScanner').disabled = false;
+            document.getElementById('unifiedScanner').focus();
+            
+            currentFilterCompany = ""; // 업체 필터 초기화
+            renderInspectionUI(record);
+        }
+    }
+
+    function renderInspectionUI(record) {
+        const summaryArea = document.getElementById('historySummaryArea');
+        const copyBtnArea = document.getElementById('historyCopyBtnArea');
+        summaryArea.innerHTML = generateGroupedSummary(record.items);
+        copyBtnArea.innerHTML = `<button onclick="copyHistoryToClipboard(${record.id})" class="text-xs bg-slate-800 text-white px-3 py-1.5 rounded-lg font-black transition-all shadow-md">복사</button>`;
+
+        const resultArea = document.getElementById('inspectionResultArea');
+        const filteredItems = currentFilterCompany ? record.items.filter(i => i.company === currentFilterCompany) : record.items;
+
+        // 업체별로 묶어서 표시
+        const itemsByCo = filteredItems.reduce((acc, item) => {
+            if(!acc[item.company]) acc[item.company] = [];
+            acc[item.company].push(item);
+            return acc;
+        }, {});
+
+        let html = `<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-8 space-y-6">`;
+
+        for (const co in itemsByCo) {
+            html += `
+                <div class="bg-white p-6 rounded-[30px] shadow-lg border border-slate-100">
+                    <div class="flex justify-between items-center mb-4 border-b pb-3">
+                        <h4 class="font-black text-lg text-slate-800">🏢 ${co}</h4>
+                        <button onclick="deleteHistoryCompany('${record.date}', '${co}')" class="text-xs text-red-400 hover:text-red-600 font-bold underline">이 업체 내역 삭제</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        ${itemsByCo[co].map(item => {
+                            const isDone = (item.inspectedQty || 0) >= item.qty;
+                            return `
+                                <div class="flex items-center justify-between py-2 px-4 rounded-xl border-2 transition-all ${isDone ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-100 shadow-sm'}">
+                                    <div class="leading-tight flex-1">
+                                        <div class="font-black text-slate-800 text-sm mb-0.5">${item.info}</div>
+                                        <div class="font-mono text-xs text-slate-500">${getPowerText(item.sph, item.cyl, item.signType)}</div>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <div class="text-right">
+                                            <input type="number" value="${item.qty}" onchange="updateHistoryQty('${record.date}', '${item.code}', this.value)"
+                                                class="w-12 p-1 border rounded-lg text-center font-black text-blue-600 bg-white text-sm">
+                                            <span class="text-xs font-bold text-slate-400 ml-1">/ ${item.inspectedQty || 0}</span>
+                                        </div>
+                                        <button onclick="deleteHistoryItem('${record.date}', '${item.code}')" class="text-slate-300 hover:text-red-500 transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+        }
+
+        html += `</div>
+            <div class="lg:col-span-4">
+                <div class="bg-red-50 p-6 rounded-[30px] border-2 border-red-100 sticky top-40">
+                    <h4 class="text-red-700 font-black mb-4 flex items-center text-base border-b border-red-100 pb-2">⚠️ 오배송 확인</h4>
+                    <div class="space-y-3 custom-scrollbar overflow-y-auto max-h-[500px] pr-1">
+                        ${record.unregisteredItems && record.unregisteredItems.length > 0 ? 
+                            record.unregisteredItems.map((code, idx) => `
+                            <div class="bg-white p-4 rounded-2xl border border-red-200 flex justify-between items-center shadow-sm">
+                                <span class="font-mono text-sm text-red-600 font-bold">${code}</span>
+                                <button onclick="confirmUnregisteredItem(${record.id}, ${idx})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-black transition-all">확인</button>
+                            </div>`).join('')
+                            : `<p class="text-red-300 italic text-center py-10 text-sm font-bold">오배송 내역이 없습니다.</p>`
+                        }
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-red-100 text-center">
+                        <button onclick="deleteHistory(${record.id})" class="text-red-300 hover:text-red-500 text-xs font-bold underline">해당 날짜 전체 기록 삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        resultArea.innerHTML = html;
+    }
+
+    // 기록 데이터 수량 변경
+    function updateHistoryQty(date, code, newQty) {
+        let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const record = history.find(h => h.date === date);
+        if(record) {
+            const item = record.items.find(i => i.code === code);
+            if(item) item.qty = Math.max(1, parseInt(newQty) || 1);
+            localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
+            renderInspectionUI(record); // UI 즉시 갱신
+        }
+    }
+
+    // 기록 데이터 개별 렌즈 삭제
+    function deleteHistoryItem(date, code) {
+        if(!confirm("이 렌즈 항목을 주문 기록에서 삭제할까요?")) return;
+        let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const record = history.find(h => h.date === date);
+        if(record) {
+            record.items = record.items.filter(i => i.code !== code);
+            localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
+            renderInspectionUI(record);
+        }
+    }
+
+    // 기록 데이터 특정 업체 전체 삭제
+    function deleteHistoryCompany(date, companyName) {
+        if(!confirm(`'${companyName}' 업체의 모든 내역을 삭제할까요?`)) return;
+        let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const record = history.find(h => h.date === date);
+        if(record) {
+            record.items = record.items.filter(i => i.company !== companyName);
+            localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
+            // 업체가 다 삭제되어 필터 대상이 바뀌었을 수 있으므로 다시 로드
+            loadHistoryByDate(document.getElementById('inspectDateSelect').value);
+        }
+    }
+
+    // 1. 칸 동기화 함수
+    function syncIndex(sourceId, targetId) {
+        const sourceVal = document.getElementById(sourceId).value;
+        document.getElementById(targetId).value = sourceVal;
+        runLivePreview();
+    }
+
+    // 2. 실시간 미리보기 함수
+    function runLivePreview() {
+        const code = document.getElementById('testBarcode').value.trim();
+        const updateText = (id, text) => {
+            const el = document.getElementById(id);
+            if(el) el.innerText = text;
+        };
+
+        if(!code) {
+            updateText('rawItem', "추출: -");
+            updateText('rawSph', "추출: -");
+            updateText('rawCyl', "추출: -");
+            updateText('previewResult', "S -0.00 C -0.00");
+            return;
+        }
+
+        // [핵심] 바코드 찍으면 자동으로 마지막 칸 채우기
+        document.getElementById('cE').value = code.length;
+
+        // 현재 입력된 범위 값들 가져오기
+        const pS = parseInt(document.getElementById('pS').value) || 0;
+        const pE = parseInt(document.getElementById('pE').value) || 0;
+        const sS = parseInt(document.getElementById('sS').value) || 0;
+        const sE = parseInt(document.getElementById('sE').value) || 0;
+        const cS = parseInt(document.getElementById('cS').value) || 0;
+        const cE = parseInt(document.getElementById('cE').value) || 0;
+
+        // [핵심] 바코드에서 실제 어떤 숫자가 뽑히는지 시각화
+        const pRaw = code.substring(pS, pE);
+        const sRaw = code.substring(sS, sE);
+        const cRaw = code.substring(cS, cE);
+
+        updateText('rawItem', "추출: " + (pRaw || "-"));
+        updateText('rawSph', "추출: " + (sRaw || "-"));
+        updateText('rawCyl', "추출: " + (cRaw || "-"));
+
+        // 계산 및 결과 표시
+        const signType = document.querySelector('input[name="lens_sign"]:checked').value;
+        const calcMode = document.getElementById('calcMode').value;
+
+        let sM = -1, cM = -1;
+        if (signType === '+') { sM = 1; cM = 1; }
+        else if (signType === 'mixed') { sM = 1; cM = -1; }
+
+        const sRes = (calculateValue(sRaw, calcMode) * sM).toFixed(2);
+        const cRes = (calculateValue(cRaw, calcMode) * cM).toFixed(2);
+        
+        updateText('previewResult', `S ${sRes > 0 ? '+' : ''}${sRes} C ${cRes > 0 ? '+' : ''}${cRes}`);
+    }
+
+    function saveRule() {
+        const code = document.getElementById('testBarcode').value;
+        if(!code) return alert("바코드를 먼저 찍어주세요.");
+
+        const newRule = {
+            id: editingRuleId || Date.now(), // 수정 중이면 기존 ID, 아니면 새 ID
+            prefix: code.substring(0, 5),
+            length: code.length, // [추가] 바코드 전체 길이를 저장
+            company: document.getElementById('selCompany').value,
+            index: document.getElementById('selIndex').value,
+            design: document.getElementById('selDesign').value,
+            type: document.getElementById('selType').value,
+            sphRange: [parseInt(document.getElementById('sS').value), parseInt(document.getElementById('sE').value)],
+            cylRange: [parseInt(document.getElementById('cS').value), parseInt(document.getElementById('cE').value)],
+            calcMode: document.getElementById('calcMode').value,
+            signType: document.querySelector('input[name="lens_sign"]:checked').value
+        };
+
+        if(editingRuleId) {
+            rules = rules.map(r => r.id === editingRuleId ? newRule : r);
+            editingRuleId = null; // 수정 완료 후 초기화
+            document.getElementById('saveRuleBtn').innerText = "이 설정을 새 규칙으로 저장";
+        } else {
+            rules.push(newRule);
+        }
+
+        localStorage.setItem('eyeRulesV4', JSON.stringify(rules));
+        renderRules();
+        alert("저장되었습니다.");
+        document.getElementById('testBarcode').value = "";
+    }
+
+    function renderRules() {
+        const list = document.getElementById('ruleListDisplay');
+        if (!list) return; // 요소가 없으면 중단
+
+        if (rules.length === 0) {
+            list.innerHTML = `<p class="col-span-full text-slate-400 italic text-center py-10">등록된 규칙이 없습니다.</p>`;
+            return;
+        }
+
+        // [1] 데이터 그룹화 (업체별)
+        const groupedRules = rules.reduce((acc, r) => {
+            if (!acc[r.company]) acc[r.company] = [];
+            acc[r.company].push(r);
+            return acc;
+        }, {});
+
+        // 업체명 순으로 정렬
+        const sortedCompanies = Object.keys(groupedRules).sort();
+
+        // [2] 화면 그리기
+        let html = '';
+        const signLabels = { '+': '원시(++)', 'mixed': '혼복(+-)', '-': '근시(--)' };
+        const signColors = { '+': 'text-red-500', 'mixed': 'text-purple-500', '-': 'text-blue-500' };
+
+        sortedCompanies.forEach(company => {
+            html += `
+                <div class="col-span-full mt-6 mb-2">
+                    <h4 class="text-xl font-black text-slate-700 flex items-center">
+                        <span class="w-1 h-6 bg-blue-600 rounded-full mr-2"></span>
+                        ${company} <span class="ml-2 text-sm text-slate-400 font-normal">${groupedRules[company].length}개 규칙</span>
+                    </h4>
+                </div>
+            `;
+
+            groupedRules[company].forEach(r => {
+                const modeLabel = signLabels[r.signType] || '기타';
+                const modeColor = signColors[r.signType] || 'text-slate-400';
+                
+                // [방어 코드] 데이터가 없는 구버전 규칙 대응
+                const pRange = r.itemRange || [0, 0];
+                const sRange = r.sphRange || [0, 0];
+                const cRange = r.cylRange || [0, 0];
+                const bLen = r.length || "미정";
+
+                html += `
+                    <div class="bg-white p-5 rounded-2xl flex justify-between items-center border-2 border-slate-50 shadow-sm hover:border-blue-300 transition-all group">
+                        <div class="flex-1">
+                            <div class="text-lg font-black text-slate-800 mb-1 leading-tight">
+                                ${r.index} ${r.design} ${r.type} 
+                                <span class="${modeColor} ml-1">${modeLabel}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 font-bold font-mono">
+                                식별코드: <span class="text-blue-600">${r.prefix}</span> (길이:${bLen}) | 
+                                범위: P(${pRange[0]}~${pRange[1]}) S(${sRange[0]}~${sRange[1]}) C(${cRange[0]}~${cRange[1]})
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="editRule(${r.id})" class="p-2 text-blue-500 hover:bg-blue-50 rounded-xl transition-all" title="수정">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                            <button onclick="deleteRule(${r.id})" class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="삭제">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>`;
+            });
+        });
+
+        list.innerHTML = html;
+    }
+
+    function deleteRule(id) { if(confirm("삭제할까요?")) { rules = rules.filter(r => r.id !== id); localStorage.setItem('eyeRulesV4', JSON.stringify(rules)); renderRules(); } }
+
+    function updateQty(index, val) { 
+        const n = parseInt(val); 
+        if(isNaN(n) || n < 1) { renderOrderTable(); return; }
+        currentOrders[index].qty = n; renderOrderTable(); 
+    }
+
+    function confirmOrder() {
+        if(currentOrders.length === 0) return alert("저장할 내역이 없습니다.");
+        
+        let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const todayStr = new Date().toLocaleDateString();
+        
+        // 1. 해당 날짜의 기존 기록 찾기
+        let dayRecord = history.find(h => h.date === todayStr);
+
+        if (dayRecord) {
+            // 2. 이미 기록이 있다면 항목 합치기
+            currentOrders.forEach(newObj => {
+                const existing = dayRecord.items.find(oldObj => oldObj.code === newObj.code);
+                if (existing) {
+                    existing.qty += newObj.qty; // 같은 렌즈면 수량 플러스
+                } else {
+                    dayRecord.items.push({...newObj}); // 새로운 렌즈면 추가
+                }
+            });
+        } else {
+            // 3. 해당 날짜 첫 저장이라면 새로 생성
+            history.unshift({
+                id: Date.now(),
+                date: todayStr,
+                items: [...currentOrders],
+                unregisteredItems: []
+            });
+        }
+        
+        localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
+        currentOrders = [];
+        scanCounter = 0;
+        renderOrderTable();
+        alert("오늘의 기록에 통합 저장되었습니다.");
+    }
+
+    function handleUnifiedScan(event) {
+        if (event.key === 'Enter' && activeRecordId) {
+            const code = event.target.value.trim();
+            event.target.value = '';
+            if(!code) return;
+
+            let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+            let record = history.find(h => h.id === activeRecordId);
+
+            if (record) {
+                // [되돌리기 저장] 찍기 전 상태를 바구니에 저장 (최대 10개까지)
+                if (undoStack.length >= 10) undoStack.shift();
+                undoStack.push(JSON.parse(JSON.stringify(history)));
+
+                const item = record.items.find(i => i.code === code);
+                if (item) {
+                    item.inspectedQty = (item.inspectedQty || 0) + 1;
+                } else {
+                    if (!record.unregisteredItems) record.unregisteredItems = [];
+                    record.unregisteredItems.push(code);
+                }
+                
+                localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
+                renderInspectionUI(record);
+            }
+        }
+    }
+
+    function deleteHistory(id) {
+        if(confirm("이 기록을 삭제하시겠습니까?")) {
+            let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+            history = history.filter(h => h.id !== id);
+            localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
+            renderHistory();
+            document.getElementById('inspectionResultArea').innerHTML = `
+                <div class="py-32 text-center text-slate-300 italic font-black text-2xl">삭제되었습니다.</div>`;
+        }
+    }
+
+    function initHistoryPage() {
+        document.getElementById('inspectDateSelect').value = '';
+        document.getElementById('sessionSelect').disabled = true;
+        document.getElementById('unifiedScanner').disabled = true;
+    }
+
+    // 메인 스캐너 엔터 이벤트
+    document.getElementById('mainScanner').addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') { processScan(e.target.value); e.target.value = ''; }
+    });
+
+    // [공통] 도수 산출 알고리즘 함수
+    function calculateValue(rawStr, mode) {
+        if (!rawStr) return 0;
+        const num = parseInt(rawStr);
+        if (isNaN(num)) return 0;
+
+        // 1. 은하 방식 (0.25 스텝 특수 계산)
+        if (mode === 'step25') {
+            const lastChar = rawStr.slice(-1); // 마지막 한 자리 추출 (0, 2, 5, 7 중 하나)
+            const prefix = parseInt(rawStr.slice(0, -1)) || 0; // 나머지 앞부분
+            
+            let step = 0;
+            if (lastChar === '2') step = 0.25;      // '2'로 끝나면 .25
+            else if (lastChar === '5') step = 0.50; // '5'로 끝나면 .50
+            else if (lastChar === '7') step = 0.75; // '7'로 끝나면 .75
+            else step = 0.00;                       // '0'이나 기타는 .00
+
+            // 앞자리 05에 0.1을 곱해 5.0을 만들고 0.25를 더함 = 5.25
+            return (prefix * 1) + step;
+        }
+        
+        // 2. 일반 방식 (숫자에 그대로 0.01 곱함)
+        return num * 0.01;
+    }
+
+    // 업체 필터 선택 시 실행
+    function filterByCompany() {
+        currentFilterCompany = document.getElementById('companyFilter').value;
+        const history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const record = history.find(h => h.id == activeRecordId);
+        if(record) renderInspectionUI(record);
+    }
+
+    // 주황색 되돌리기 버튼 눌렀을 때 실행
+    function undoScan() {
+        if (undoStack.length === 0) return alert("되돌릴 기록이 없습니다.");
+        
+        const previousState = undoStack.pop(); // 가장 최근 저장된 상태를 꺼냅니다.
+        localStorage.setItem('eyeHistoryV4', JSON.stringify(previousState));
+        
+        const record = previousState.find(h => h.id === activeRecordId);
+        renderInspectionUI(record);
+    }
+
+    function confirmUnregisteredItem(historyId, itemIndex) {
+        let history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const record = history.find(h => h.id === historyId);
+        
+        if (record && record.unregisteredItems) {
+            // 해당 순서의 바코드를 목록에서 제거
+            record.unregisteredItems.splice(itemIndex, 1);
+            
+            // 데이터 저장 및 화면 갱신
+            localStorage.setItem('eyeHistoryV4', JSON.stringify(history));
+            renderInspectionUI(record);
+        }
+    }
+
+    // 1. 도수 방식 변경 (근시/원시)
+    function changeStockSign(sign) {
+        currentStockSign = sign;
+        const btns = { '-': 'btn-stock-minus', '+': 'btn-stock-plus', 'mixed': 'btn-stock-mixed' };
+        const colors = { '-': 'bg-blue-600', '+': 'bg-red-500', 'mixed': 'bg-purple-600' };
+        
+        Object.keys(btns).forEach(k => {
+            const el = document.getElementById(btns[k]);
+            if(k === sign) el.className = `flex-1 py-3 rounded-xl font-black text-white shadow-lg ${colors[k]}`;
+            else el.className = "flex-1 py-3 rounded-xl font-black bg-slate-100 text-slate-400";
+        });
+
+        renderStockGrid();
+    }
+
+    // 2. 도수 분포 표(Grid) 그리기 - [전체 수정 버전]
+    function renderStockGrid() {
+        const area = document.getElementById('stockGridArea');
+        let sRange = [], cRange = [];
+
+        // 1. 도수 범위 설정
+        if (currentStockSign === '-') { // 근시
+            for (let s = 0; s >= -8.00; s -= 0.25) sRange.push(s.toFixed(2));
+            for (let c = 0; c >= -3.00; c -= 0.25) cRange.push(c.toFixed(2));
+        } else if (currentStockSign === '+') { // 원시
+            for (let s = 0; s <= 4.00; s += 0.25) sRange.push(s.toFixed(2));
+            for (let c = 0; c <= 2.00; c += 0.25) cRange.push(c.toFixed(2));
+        } else { // 혼복 (+/-)
+            for (let s = 0; s <= 4.00; s += 0.25) sRange.push(s.toFixed(2));
+            for (let c = 0; c >= -2.00; c -= 0.25) cRange.push(c.toFixed(2));
+        }
+
+        // 2. 상단 CYL 헤더 생성
+        let html = `<table class="w-full border-collapse text-center font-mono">
+            <thead><tr class="bg-slate-100 text-slate-500 text-lg">
+                <th class="border py-1 px-1 bg-white sticky left-0 z-10 w-16">S \\ C</th>
+                ${cRange.map(c => {
+                    let displayC = c;
+                    if (parseFloat(c) >= 0 && currentStockSign === '+') displayC = '+' + c;
+                    return `<th class="border py-1 px-0.5 min-w-[50px]">${displayC}</th>`;
+                }).join('')}
+            </tr></thead><tbody>`;
+
+        const catKey = getStockCategoryKey();
+
+        // 3. 좌측 SPH 라벨 및 본문 생성
+        sRange.forEach(s => {
+            let displayS = s;
+            if (parseFloat(s) >= 0 && (currentStockSign === '+' || currentStockSign === 'mixed')) {
+                displayS = '+' + s;
+            }
+
+            html += `<tr><td class="bg-slate-50 border py-1 px-1 font-black text-slate-700 sticky left-0 z-10 text-lg">${displayS}</td>`;
+            
+            cRange.forEach(c => {
+                // [수정 포인트] 여기서 displayC를 정의해줘야 에러가 안 납니다!
+                let displayC = c;
+                if (parseFloat(c) >= 0 && currentStockSign === '+') displayC = '+' + c;
+
+                const dataKey = `${catKey}_${s}_${c}`;
+                const count = parseInt(stockData[dataKey]) || 0;
+                
+                // 수량별 배경색 설정
+                let colorStyle = "bg-white text-slate-200"; 
+                if (count === 1) colorStyle = "bg-blue-500 text-white font-black"; 
+                else if (count === 2) colorStyle = "bg-green-500 text-white font-black"; 
+                else if (count === 3) colorStyle = "bg-orange-400 text-white font-black"; 
+                else if (count >= 4) colorStyle = "bg-red-600 text-white font-black"; 
+
+                const displayText = count > 0 ? count : "";
+                
+                // [수정 포인트] title에 displayS와 displayC를 정확히 넣어줌
+                html += `<td id="cell-${dataKey}" 
+                            contenteditable="true"
+                            onblur="manualEditStock('${dataKey}', this.innerText)"
+                            title="SPH: ${displayS} / CYL: ${displayC}" 
+                            class="border py-1 px-0.5 h-10 outline-none focus:ring-2 focus:ring-inset focus:ring-black text-xl duration-150 cursor-help ${colorStyle}">
+                            ${displayText}
+                        </td>`;
+            });
+            html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        area.innerHTML = html;
+
+        const total = Object.keys(stockData).filter(k => k.startsWith(catKey)).reduce((sum, k) => sum + (parseInt(stockData[k]) || 0), 0);
+        document.getElementById('stockTotalCount').innerText = `현재 분류 합계: ${total}개`;
+    }
+
+    function manualEditStock(dataKey, newVal) {
+        const num = parseInt(newVal);
+        if (isNaN(num) || num <= 0) {
+            delete stockData[dataKey]; // 숫자가 아니거나 0이면 삭제
+        } else {
+            stockData[dataKey] = num;
+        }
+        // 전체 합계만 조용히 업데이트
+        const catKey = getStockCategoryKey();
+        const total = Object.keys(stockData).filter(k => k.startsWith(catKey)).reduce((sum, k) => sum + (parseInt(stockData[k]) || 0), 0);
+        document.getElementById('stockTotalCount').innerText = `현재 분류 합계: ${total}개`;
+    }
+
+    function getStockCategoryKey() {
+        const co = document.getElementById('stockCompany').value;
+        const idx = document.getElementById('stockIndex').value;
+        const ds = document.getElementById('stockDesign').value;
+        const ty = document.getElementById('stockType').value;
+        return `${co}_${idx}_${ds}_${ty}`;
+    }
+
+    // 3. 재고 스캔 핵심 로직
+    function handleStockScan(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // 엔터키 반동 방지
+            const code = event.target.value.trim();
+            event.target.value = '';
+            if(!code) return;
+
+            // 1. 바코드 규칙 찾기
+            const rule = rules.find(r => code.startsWith(r.prefix));
+            if(!rule) return alert("등록되지 않은 바코드 규칙입니다.");
+
+            // 2. 도수 계산 먼저 수행
+            let sM = -1, cM = -1;
+            if (rule.signType === '+') { sM = 1; cM = 1; }
+            else if (rule.signType === 'mixed') { sM = 1; cM = -1; }
+
+            const sRaw = code.substring(rule.sphRange[0], rule.sphRange[1]);
+            const cRaw = code.substring(rule.cylRange[0], rule.cylRange[1]);
+            const sph = (calculateValue(sRaw, rule.calcMode || 'normal') * sM).toFixed(2);
+            const cyl = (calculateValue(cRaw, rule.calcMode || 'normal') * cM).toFixed(2);
+
+            // 3. [중요] 데이터 업데이트를 가장 먼저 합니다 (화면 그리기 전)
+            const scannedCat = `${rule.company}_${rule.index}_${rule.design}_${rule.type}`;
+            const dataKey = `${scannedCat}_${sph}_${cyl}`;
+            stockData[dataKey] = (stockData[dataKey] || 0) + 1;
+            const newCount = stockData[dataKey];
+
+            // 4. 현재 화면 정보와 비교
+            const currentCat = getStockCategoryKey();
+            const isSameCategory = (currentCat === scannedCat && rule.signType === currentStockSign);
+
+            if (!isSameCategory) {
+                // 카테고리가 다르면 상단 UI 맞추고 '전체 리렌더링'
+                document.getElementById('stockCompany').value = rule.company;
+                document.getElementById('stockIndex').value = rule.index;
+                document.getElementById('stockDesign').value = rule.design;
+                document.getElementById('stockType').value = rule.type;
+                
+                // 부호 상태 강제 업데이트 및 버튼 색상 변경
+                currentStockSign = rule.signType;
+                const btns = { '-': 'btn-stock-minus', '+': 'btn-stock-plus', 'mixed': 'btn-stock-mixed' };
+                const colors = { '-': 'bg-blue-600', '+': 'bg-red-500', 'mixed': 'bg-purple-600' };
+                Object.keys(btns).forEach(k => {
+                    const el = document.getElementById(btns[k]);
+                    if(k === rule.signType) el.className = `flex-1 py-2 rounded-lg font-black text-xs text-white shadow-sm ${colors[k]}`;
+                    else el.className = "flex-1 py-2 rounded-lg font-black bg-slate-100 text-slate-400 text-xs";
+                });
+
+                renderStockGrid(); // 여기서 숫자가 1인 상태의 표가 그려짐
+            } else {
+                // 같은 카테고리면 해당 셀만 '부분 업데이트'
+                const cell = document.getElementById(`cell-${dataKey}`);
+                if(cell) {
+                    cell.innerText = newCount;
+                    // 색상 및 클래스 갱신
+                    cell.className = "border py-1 px-0.5 h-10 outline-none focus:ring-2 focus:ring-inset focus:ring-black text-xl transition-all duration-150 cursor-help font-black text-white ";
+                    if (newCount === 1) cell.classList.add("bg-blue-500");
+                    else if (newCount === 2) cell.classList.add("bg-green-500");
+                    else if (newCount === 3) cell.classList.add("bg-orange-400");
+                    else if (newCount >= 4) cell.classList.add("bg-red-600");
+                    updateTotalOnly(scannedCat);
+                }
+            }
+
+            // 5. 위치 추적 및 강조 효과
+            setTimeout(() => {
+                const cell = document.getElementById(`cell-${dataKey}`);
+                if(cell) {
+                    cell.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                    cell.classList.add('ring-4', 'ring-blue-400', 'ring-offset-2', 'z-50', 'relative', 'scale-125');
+                    setTimeout(() => {
+                        cell.classList.remove('ring-4', 'ring-blue-400', 'ring-offset-2', 'z-50', 'relative', 'scale-125');
+                    }, 500);
+                }
+            }, 100);
+        }
+    }
+
+    // 4. 저장 및 엑셀 기능
+    function saveStockTemp() {
+        localStorage.setItem('tempStockV6', JSON.stringify(stockData));
+        alert("현재 데이터가 임시 저장되었습니다.");
+    }
+
+    function resetStock() {
+        if(confirm("모든 데이터를 초기화할까요?")) {
+            stockData = {};
+            localStorage.removeItem('tempStockV6');
+            renderStockGrid();
+        }
+    }
+
+    // 카톡용 요약 복사 기능
+    function copySummaryToClipboard() {
+        if (currentOrders.length === 0) return alert("복사할 주문 내역이 없습니다.");
+        const finalText = formatOrdersToText(currentOrders, "주문 내역");
+        navigator.clipboard.writeText(finalText).then(() => {
+            alert("카톡용 텍스트가 복사되었습니다!");
+        });
+    }
+
+    // 상단 합계 텍스트만 업데이트하는 함수
+    function updateTotalOnly(catKey) {
+        const total = Object.keys(stockData)
+            .filter(k => k.startsWith(catKey))
+            .reduce((sum, k) => sum + (parseInt(stockData[k]) || 0), 0);
+        document.getElementById('stockTotalCount').innerText = `현재 분류 합계: ${total}개`;
+    }
+
+    // 1. 업체 목록 및 드롭다운 렌더링
+    function renderCompanyLists() {
+        const listArea = document.getElementById('companyManageList');
+        
+        // 업체 관리 버튼들 생성
+        listArea.innerHTML = companyList.map(name => `
+            <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden shadow-sm">
+                <span class="px-3 py-1.5 font-bold text-sm text-slate-700">${name}</span>
+                <button onclick="editCompany('${name}')" class="bg-slate-100 px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 border-l border-slate-200">수정</button>
+                <button onclick="deleteCompany('${name}')" class="bg-slate-100 px-2 py-1.5 text-xs text-red-500 hover:bg-red-50 border-l border-slate-200">삭제</button>
+            </div>
+        `).join('');
+
+        // 모든 업체 선택 셀렉트박스(Dropdown) 업데이트
+        const selectors = ['selCompany', 'stockCompany', 'companyFilter'];
+        selectors.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const currentVal = el.value;
+                let options = companyList.map(c => `<option value="${c}">${c}</option>`).join('');
+                if (id === 'companyFilter') options = `<option value="">전체 업체</option>` + options;
+                el.innerHTML = options;
+                if (companyList.includes(currentVal)) el.value = currentVal;
+            }
+        });
+    }
+
+    // 2. 업체 추가
+    function addCompany() {
+        const nameInput = document.getElementById('newCompanyName');
+        const name = nameInput.value.trim();
+        if (!name) return;
+        if (companyList.includes(name)) return alert("이미 등록된 업체입니다.");
+
+        companyList.push(name);
+        saveCompanyData();
+        nameInput.value = '';
+    }
+
+    // 3. 업체 수정 (가장 중요: 기존 규칙들까지 연동)
+    function editCompany(oldName) {
+        const newName = prompt(`'${oldName}'을(를) 무엇으로 수정할까요?`, oldName);
+        if (!newName || newName === oldName) return;
+        if (companyList.includes(newName)) return alert("이미 존재하는 업체명입니다.");
+
+        // 업체 목록 업데이트
+        companyList = companyList.map(c => c === oldName ? newName : c);
+        
+        // [핵심] 기존 바코드 규칙(rules)에 등록된 이름들도 전부 교체
+        rules = rules.map(r => {
+            if (r.company === oldName) r.company = newName;
+            return r;
+        });
+
+        // [핵심] 재고 데이터(stockData)의 키값들도 전부 교체
+        const newStockData = {};
+        for (let key in stockData) {
+            if (key.startsWith(oldName + "_")) {
+                const newKey = key.replace(oldName + "_", newName + "_");
+                newStockData[newKey] = stockData[key];
+            } else {
+                newStockData[key] = stockData[key];
+            }
+        }
+        stockData = newStockData;
+
+        saveCompanyData();
+        localStorage.setItem('eyeRulesV4', JSON.stringify(rules));
+        localStorage.setItem('tempStockV6', JSON.stringify(stockData));
+        
+        renderRules(); // 규칙 리스트 다시 그리기
+        renderStockGrid(); // 재고 그리드 다시 그리기
+        alert("업체명과 관련된 모든 데이터가 수정되었습니다.");
+    }
+
+    // 4. 업체 삭제
+    function deleteCompany(name) {
+        const hasRules = rules.some(r => r.company === name);
+        if (hasRules) {
+            if (!confirm(`'${name}' 업체로 등록된 바코드 규칙이 있습니다. 삭제하면 해당 규칙을 사용할 수 없습니다. 그래도 삭제할까요?`)) return;
+        } else {
+            if (!confirm(`'${name}' 업체를 삭제할까요?`)) return;
+        }
+
+        companyList = companyList.filter(c => c !== name);
+        saveCompanyData();
+    }
+
+    // 5. 저장 공통 함수
+    function saveCompanyData() {
+        localStorage.setItem('eyeCompanies', JSON.stringify(companyList));
+        renderCompanyLists();
+    }
+
+    function editRule(id) {
+        const r = rules.find(rule => rule.id === id);
+        if(!r) return;
+        
+        editingRuleId = id; 
+        document.getElementById('testBarcode').value = r.prefix + " (수정 중)";
+        document.getElementById('selCompany').value = r.company;
+        document.getElementById('selIndex').value = r.index;
+        document.getElementById('selDesign').value = r.design;
+        document.getElementById('selType').value = r.type;
+        
+        // 범위 값 불러오기 (데이터가 없을 경우 기본값 0 설정)
+        const pR = r.itemRange || [0, 5];
+        document.getElementById('pS').value = pR[0]; document.getElementById('pE').value = pR[1];
+        document.getElementById('sS').value = r.sphRange[0]; document.getElementById('sE').value = r.sphRange[1];
+        document.getElementById('cS').value = r.cylRange[0]; document.getElementById('cE').value = r.cylRange[1];
+        
+        document.getElementById('calcMode').value = r.calcMode || 'normal';
+        document.querySelector(`input[name="lens_sign"][value="${r.signType}"]`).checked = true;
+
+        document.getElementById('saveRuleBtn').innerText = "수정 완료하기";
+        window.scrollTo({ top: 0, behavior: 'smooth' }); 
+        runLivePreview(); // 미리보기 즉시 갱신
+    }
+
+    function generateGroupedSummary(orderArray) {
+        if (!orderArray || orderArray.length === 0) return `<p class="text-slate-400 italic text-center py-4 text-sm">데이터 없음</p>`;
+
+        // 1. 다중 그룹화 (업체 > 굴절률 > 렌즈종류 > 부호)
+        const grouped = orderArray.reduce((acc, obj) => {
+            if (!acc[obj.company]) acc[obj.company] = {};
+            if (!acc[obj.company][obj.index]) acc[obj.company][obj.index] = {};
+            if (!acc[obj.company][obj.index][obj.info]) acc[obj.company][obj.index][obj.info] = {};
+            if (!acc[obj.company][obj.index][obj.info][obj.signType]) acc[obj.company][obj.index][obj.info][obj.signType] = [];
+            acc[obj.company][obj.index][obj.info][obj.signType].push(obj);
+            return acc;
+        }, {});
+
+        let html = '';
+        const signOrder = { '-': 1, '+': 2, 'mixed': 3 }; // 근시 -> 원시 -> 혼복 순서 정의
+        const signLabels = { '-': '🔵 근시', '+': '🔴 원시', 'mixed': '🟣 혼복' };
+
+        // [Step 1] 업체별 루프
+        for (const company in grouped) {
+            let companyTotal = orderArray.filter(o => o.company === company).reduce((sum, item) => sum + item.qty, 0);
+
+            html += `
+                <div class="mb-3 border-b border-slate-100 pb-1">
+                    <div class="flex justify-between items-center bg-slate-100 px-2 py-0.5 rounded-t-md">
+                        <span class="text-blue-800 font-black text-sm">🏢 ${company}</span>
+                        <span class="text-blue-900 font-black text-sm">${companyTotal}개</span>
+                    </div>`;
+
+            // [Step 2] 굴절률 정렬 (낮은 순: 1.56 -> 1.60 -> 1.67...)
+            const sortedIndexes = Object.keys(grouped[company]).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+            sortedIndexes.forEach(index => {
+                for (const info in grouped[company][index]) {
+                    // 제품명 표기 (굴절률 포함되어 있음)
+                    html += `<div class="text-base font-black text-slate-800 ml-1 mt-1 mb-0.5">▶ ${info}</div>`;
+
+                    // [Step 3] 도수 방식 정렬 (근시 -> 원시 -> 혼복)
+                    const sortedSigns = Object.keys(grouped[company][index][info]).sort((a, b) => signOrder[a] - signOrder[b]);
+
+                    sortedSigns.forEach(sign => {
+                        html += `<div class="text-xs text-slate-800 font-bold ml-2 mt-0.5">${signLabels[sign]}</div>`;
+
+                        // [Step 4] 도수 정렬 (난시 낮은 순 -> 근시 낮은 순)
+                        // 절대값이 작을수록(0.00에 가까울수록) 위로 올라옵니다.
+                        const sortedItems = grouped[company][index][info][sign].sort((a, b) => {
+                            const cylA = Math.abs(parseFloat(a.cyl)), cylB = Math.abs(parseFloat(b.cyl));
+                            const sphA = Math.abs(parseFloat(a.sph)), sphB = Math.abs(parseFloat(b.sph));
+                            
+                            if (cylA !== cylB) return cylA - cylB; // 난시 낮은 순
+                            return sphA - sphB; // 근시 낮은 순
+                        });
+
+                        sortedItems.forEach(item => {
+                            html += `
+                                <div class="flex justify-between items-center ml-4 py-0 border-b border-slate-50 last:border-0 leading-none h-6">
+                                    <div class="text-[17px] font-mono font-black tracking-tighter text-slate-700">
+                                        ${getPowerText(item.sph, item.cyl, item.signType)}
+                                    </div>
+                                    <div class="text-[14px] font-black text-blue-600 ml-2">
+                                        ×${item.qty}
+                                    </div>
+                                </div>`;
+                        });
+                    });
+                }
+            });
+            html += `</div>`;
+        }
+        return html;
+    }
+
+
+    function copyHistoryToClipboard(recordId) {
+        const history = JSON.parse(localStorage.getItem('eyeHistoryV4')) || [];
+        const record = history.find(h => h.id === recordId);
+        if (!record) return alert("데이터가 없습니다.");
+
+        const finalText = formatOrdersToText(record.items, "기록조회");
+        navigator.clipboard.writeText(finalText).then(() => {
+            alert("카톡용 텍스트가 복사되었습니다!");
+        });
+    }
+
+    // 한쪽 인덱스를 바꾸면 연결된 인덱스도 같이 바꿔주는 함수
+    function syncIndex(sourceId, targetId) {
+        const sourceVal = document.getElementById(sourceId).value;
+        document.getElementById(targetId).value = sourceVal;
+        runLivePreview(); // 변경된 값으로 즉시 결과 확인
+    }
+
+
+    function formatOrdersToText(orderArray, titlePrefix) {
+        if (!orderArray || orderArray.length === 0) return "";
+
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        
+        // 1. 데이터 그룹화
+        const grouped = orderArray.reduce((acc, obj) => {
+            if (!acc[obj.company]) acc[obj.company] = {};
+            if (!acc[obj.company][obj.index]) acc[obj.company][obj.index] = {};
+            if (!acc[obj.company][obj.index][obj.info]) acc[obj.company][obj.index][obj.info] = {};
+            if (!acc[obj.company][obj.index][obj.info][obj.signType]) acc[obj.company][obj.index][obj.info][obj.signType] = [];
+            acc[obj.company][obj.index][obj.info][obj.signType].push(obj);
+            return acc;
+        }, {});
+
+        let text = `[아이젠트리 ${titlePrefix} - ${dateStr} ${timeStr}]\n\n`;
+        const signOrder = { '-': 1, '+': 2, 'mixed': 3 };
+        const signLabels = { '-': '🔵 근시', '+': '🔴 원시', 'mixed': '🟣 혼복' };
+
+        for (const company in grouped) {
+            const companyTotal = orderArray.filter(o => o.company === company).reduce((sum, item) => sum + item.qty, 0);
+            text += `🏢 ${company} (${companyTotal}개)\n`;
+
+            // 굴절률 정렬
+            const sortedIndexes = Object.keys(grouped[company]).sort((a, b) => parseFloat(a) - parseFloat(b));
+            
+            sortedIndexes.forEach(index => {
+                for (const info in grouped[company][index]) {
+                    text += `▶ ${info}\n`;
+
+                    // 부호 정렬
+                    const sortedSigns = Object.keys(grouped[company][index][info]).sort((a, b) => signOrder[a] - signOrder[b]);
+
+                    sortedSigns.forEach(sign => {
+                        text += `  ${signLabels[sign]}\n`;
+
+                        // 도수 정렬 (난시 낮은순 -> 근시 낮은순)
+                        const sortedItems = grouped[company][index][info][sign].sort((a, b) => {
+                            const cylA = Math.abs(parseFloat(a.cyl)), cylB = Math.abs(parseFloat(b.cyl));
+                            const sphA = Math.abs(parseFloat(a.sph)), sphB = Math.abs(parseFloat(b.sph));
+                            if (cylA !== cylB) return cylA - cylB;
+                            return sphA - sphB;
+                        });
+
+                        sortedItems.forEach(item => {
+                            const s = parseFloat(item.sph);
+                            const c = parseFloat(item.cyl);
+                            const sphT = s >= 0 ? `+${s.toFixed(2)}` : s.toFixed(2);
+                            const cylT = c >= 0 ? `+${c.toFixed(2)}` : c.toFixed(2);
+                            text += `   ㄴ S ${sphT} C ${cylT} × ${item.qty}개\n`;
+                        });
+                    });
+                }
+            });
+            text += `\n`;
+        }
+        return text.trim();
+    }
+
+    // 초기 실행
+    renderRules();
+    window.onload = () => {
+    document.getElementById('mainScanner').focus();
+};
+</script>
+</body>
+</html>
